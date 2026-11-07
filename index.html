@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cek Barcode Produk</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- HTML5 QR Code Library -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .card-product { border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+    .product-img { max-height: 250px; object-fit: contain; width: 100%; border-radius: 8px; }
+    #reader { width: 100%; max-width: 500px; margin: 0 auto; border-radius: 10px; overflow: hidden; }
+    .badge-cat { background-color: #eef2ff; color: #4f46e5; font-weight: 600; }
+  </style>
+</head>
+<body class="py-4">
+
+<div class="container" style="max-width: 600px;">
+  <div class="text-center mb-4">
+    <h3 class="fw-bold text-primary">Cek Detail Produk</h3>
+    <p class="text-muted small">Scan barcode via Kamera Live, upload foto, atau ketik manual</p>
+  </div>
+
+  <!-- Form Input & Scanner Actions -->
+  <div class="card p-3 mb-4 shadow-sm">
+    <div class="input-group mb-3">
+      <input type="text" id="barcodeInput" class="form-control" placeholder="Ketik atau scan barcode..." autofocus>
+      <button class="btn btn-primary fw-semibold" onclick="prosesCari()">Cari</button>
+    </div>
+
+    <button class="btn btn-success fw-semibold w-100 mb-2" onclick="toggleScanner()">
+      🎥 Scan Kamera Live
+    </button>
+
+    <div>
+      <label for="qrInputFile" class="btn btn-outline-secondary w-100 fw-semibold">
+        📷 Upload / Ambil Foto Barcode
+      </label>
+      <input type="file" id="qrInputFile" accept="image/*" capture="environment" style="display: none;" onchange="scanDariFoto(event)">
+    </div>
+  </div>
+
+  <!-- Camera Live Scanner Box -->
+  <div id="scannerContainer" class="card p-2 mb-4 text-center shadow-sm" style="display: none;">
+    <div id="reader"></div>
+    <button class="btn btn-sm btn-secondary mt-2" onclick="stopScanner()">Tutup Kamera</button>
+  </div>
+
+  <!-- Status / Alert -->
+  <div id="statusMessage" class="text-center my-3" style="display: none;"></div>
+
+  <!-- Result Display Card -->
+  <div id="resultCard" class="card card-product p-4" style="display: none;">
+    <div class="text-center mb-3">
+      <img id="pGambar" src="" alt="Foto Produk" class="product-img bg-light p-2 mb-3">
+      <h4 id="pNama" class="fw-bold mb-1"></h4>
+      <div>
+        <span id="pBigCat" class="badge badge-cat me-1"></span>
+        <span id="pDetailCat" class="badge bg-secondary"></span>
+      </div>
+    </div>
+
+    <hr>
+
+    <div class="row g-2">
+      <div class="col-6">
+        <small class="text-muted d-block">SKU</small>
+        <span id="pSku" class="fw-semibold"></span>
+      </div>
+      <div class="col-6">
+        <small class="text-muted d-block">Barcode</small>
+        <span id="pBarcode" class="fw-semibold"></span>
+      </div>
+      <div class="col-4 mt-3">
+        <small class="text-muted d-block">Harga Normal</small>
+        <span id="pHargaNormal" class="fw-bold text-dark"></span>
+      </div>
+      <div class="col-4 mt-3">
+        <small class="text-muted d-block">Diskon</small>
+        <span id="pDiskon" class="fw-bold text-warning"></span>
+      </div>
+      <div class="col-4 mt-3">
+        <small class="text-muted d-block">Harga Promo</small>
+        <span id="pHargaPromo" class="fw-bold text-success fs-5"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_URL = "https://script.google.com/macros/s/AKfycbyDW1Cyl-7LROJ6V-pdLV2SIH_Y_2kptEfrUpqtO5Kno26JNwcHjtOkZha_10LHhrXs2A/exec";
+
+  let html5QrcodeScanner = null;
+
+  document.getElementById("barcodeInput").addEventListener("keyup", function(e) {
+    if (e.key === "Enter") prosesCari();
+  });
+
+  // 1. FETCH DATA KE GOOGLE SHEETS VIA APPS SCRIPT API
+  async function prosesCari() {
+    const barcode = document.getElementById("barcodeInput").value.trim();
+    if (!barcode) return;
+
+    showStatus('<div class="spinner-border spinner-border-sm text-primary"></div> Memuat data...', 'info');
+    document.getElementById("resultCard").style.display = "none";
+
+    try {
+      const response = await fetch(`${API_URL}?barcode=${encodeURIComponent(barcode)}`);
+      const res = await response.json();
+
+      if (res.status === 'success') {
+        renderProduct(res.data);
+      } else {
+        showStatus('❌ ' + (res.message || 'Produk tidak ditemukan.'), 'danger');
+      }
+    } catch (err) {
+      showStatus('⚠️ Terjadi kesalahan koneksi ke server API.', 'danger');
+      console.error(err);
+    }
+  }
+
+  function renderProduct(p) {
+    hideStatus();
+    document.getElementById("pNama").innerText = p.namaProduk || '-';
+    document.getElementById("pSku").innerText = p.sku || '-';
+    document.getElementById("pBarcode").innerText = p.barcode || '-';
+    document.getElementById("pBigCat").innerText = p.bigCategory || '-';
+    document.getElementById("pDetailCat").innerText = p.detailCategory || '-';
+    
+    document.getElementById("pHargaNormal").innerText = typeof p.hargaNormal === 'number' ? 'Rp ' + p.hargaNormal.toLocaleString('id-ID') : (p.hargaNormal || '-');
+    document.getElementById("pDiskon").innerText = p.diskon || '-';
+    document.getElementById("pHargaPromo").innerText = typeof p.hargaPromo === 'number' ? 'Rp ' + p.hargaPromo.toLocaleString('id-ID') : (p.hargaPromo || '-');
+
+    const img = document.getElementById("pGambar");
+    if (p.gambarUrl && String(p.gambarUrl).startsWith('http')) {
+      img.src = p.gambarUrl;
+      img.style.display = "block";
+    } else {
+      img.style.display = "none";
+    }
+
+    document.getElementById("resultCard").style.display = "block";
+  }
+
+  function showStatus(msg, type) {
+    const st = document.getElementById("statusMessage");
+    st.className = `text-center my-3 text-${type}`;
+    st.innerHTML = msg;
+    st.style.display = "block";
+  }
+
+  function hideStatus() {
+    document.getElementById("statusMessage").style.display = "none";
+  }
+
+  // 2. LIVE CAMERA SCANNER
+  function toggleScanner() {
+    const container = document.getElementById("scannerContainer");
+    if (container.style.display === "none") {
+      container.style.display = "block";
+      startScanner();
+    } else {
+      stopScanner();
+    }
+  }
+
+  function startScanner() {
+    if (!html5QrcodeScanner) {
+      html5QrcodeScanner = new Html5Qrcode("reader");
+    }
+
+    const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+
+    html5QrcodeScanner.start(
+      { facingMode: "environment" }, // Prioritas kamera belakang HP
+      config,
+      (decodedText) => {
+        document.getElementById("barcodeInput").value = decodedText;
+        stopScanner();
+        prosesCari();
+      },
+      (errorMessage) => {}
+    ).catch(err => {
+      // Fallback untuk webcam laptop
+      html5QrcodeScanner.start(
+        { facingMode: "user" },
+        config,
+        (decodedText) => {
+          document.getElementById("barcodeInput").value = decodedText;
+          stopScanner();
+          prosesCari();
+        },
+        (errorMessage) => {}
+      ).catch(e => {
+        alert("Gagal mengakses kamera: " + e);
+        stopScanner();
+      });
+    });
+  }
+
+  function stopScanner() {
+    if (html5QrcodeScanner) {
+      html5QrcodeScanner.stop().then(() => {
+        document.getElementById("scannerContainer").style.display = "none";
+      }).catch(() => {
+        document.getElementById("scannerContainer").style.display = "none";
+      });
+    } else {
+      document.getElementById("scannerContainer").style.display = "none";
+    }
+  }
+
+  // 3. SCAN BARCODE DARI UPLOAD FOTO
+  function scanDariFoto(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    showStatus('<div class="spinner-border spinner-border-sm text-primary"></div> Membaca barcode dari gambar...', 'info');
+    document.getElementById("resultCard").style.display = "none";
+
+    const scanner = new Html5Qrcode("reader");
+    scanner.scanFile(file, true)
+      .then(decodedText => {
+        document.getElementById("barcodeInput").value = decodedText;
+        prosesCari();
+      })
+      .catch(() => {
+        showStatus('❌ Barcode tidak terdeteksi pada gambar.', 'danger');
+      });
+  }
+</script>
+</body>
+</html>

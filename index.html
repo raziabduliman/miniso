@@ -56,7 +56,7 @@
   <!-- Result Display Card -->
   <div id="resultCard" class="card card-product p-4" style="display: none;">
     <div class="text-center mb-3">
-      <img id="pGambar" src="" alt="Foto Produk" class="product-img bg-light p-2 mb-3">
+      <img id="pGambar" src="" alt="Foto Produk" class="product-img bg-light p-2 mb-3" referrerpolicy="no-referrer" onerror="this.style.display='none';">
       <h4 id="pNama" class="fw-bold mb-1"></h4>
       <div>
         <span id="pBigCat" class="badge badge-cat me-1"></span>
@@ -135,13 +135,27 @@
     document.getElementById("pDiskon").innerText = p.diskon || '-';
     document.getElementById("pHargaPromo").innerText = typeof p.hargaPromo === 'number' ? 'Rp ' + p.hargaPromo.toLocaleString('id-ID') : (p.hargaPromo || '-');
 
+    // const img = document.getElementById("pGambar");
+    // if (p.gambarUrl && String(p.gambarUrl).startsWith('http')) {
+    //   img.src = p.gambarUrl;
+    //   img.style.display = "block";
+    // } else {
+    //   img.style.display = "none";
+    // }
     const img = document.getElementById("pGambar");
-    if (p.gambarUrl && String(p.gambarUrl).startsWith('http')) {
-      img.src = p.gambarUrl;
-      img.style.display = "block";
-    } else {
-      img.style.display = "none";
+  let imgUrl = p.gambarUrl ? String(p.gambarUrl).trim() : '';
+
+  if (imgUrl) {
+    // Paksa gunakan HTTPS jika masih HTTP
+    if (imgUrl.startsWith('http://')) {
+      imgUrl = imgUrl.replace('http://', 'https://');
     }
+
+    img.src = imgUrl;
+    img.style.display = "block";
+  } else {
+    img.style.display = "none";
+  }
 
     document.getElementById("resultCard").style.display = "block";
   }
